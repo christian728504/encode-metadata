@@ -39,6 +39,7 @@ def _(Path, os):
     ROOT = Path(os.getcwd())
     RESOURCES = ROOT / "resources"
     OUTPUT = ROOT / "output"
+    OUTPUT.mkdir(exist_ok=True, parents=True)
     CHROMBPNET_DIR = "/data/zusers/ramirezc/all_chrombpnet_files"
     BPNET_DIR = "/data/zusers/ramirezc/all_bpnet_files"
     MANIFEST_ENTRY_FORMAT = "{url}\n\tdir={dir}\n\tout={out}\n"
@@ -272,6 +273,7 @@ def _(MANIFEST_ENTRY_FORMAT, OUTPUT, Path, chrombpnet_derived, os):
     _df = chrombpnet_derived
 
     with (OUTPUT / "ChromBPNet-model-annotations.manifest").open("w") as _f:
+        _seen = set()
         for _path in (
             _df["models"].to_list()
             + _df["observed_signal_profile"].to_list()
@@ -280,11 +282,17 @@ def _(MANIFEST_ENTRY_FORMAT, OUTPUT, Path, chrombpnet_derived, os):
         ):
             _path = Path(_path)
             if not _path.exists():
-                print(f"{_path} does not exist")
                 _dir = _path.parent
                 _base = _path.name
                 _acc = _path.name.split(os.extsep)[0]
+
+                if _acc in _seen:
+                    continue
+                else:
+                    _seen.add(_acc)
+
                 _url = f"https://encodeproject.org/{_acc}/@@download/{_base}"
+                print(f"{_path} does not exist")
                 _f.write(
                     MANIFEST_ENTRY_FORMAT.format(url=_url, dir=_dir, out=_base)
                 )
@@ -393,6 +401,7 @@ def _(MANIFEST_ENTRY_FORMAT, OUTPUT, Path, bpnet_derived, os):
     _df = bpnet_derived
 
     with (OUTPUT / "BPNet-model-annotations.manifest").open("w") as _f:
+        _seen = set()
         for _path in (
             _df["models"].to_list()
             + _df["observed_control_profile_plus_strand"].to_list()
@@ -403,11 +412,17 @@ def _(MANIFEST_ENTRY_FORMAT, OUTPUT, Path, bpnet_derived, os):
         ):
             _path = Path(_path)
             if not _path.exists():
-                print(f"{_path} does not exist")
                 _dir = _path.parent
                 _base = _path.name
                 _acc = _path.name.split(os.extsep)[0]
+
+                if _acc in _seen:
+                    continue
+                else:
+                    _seen.add(_acc)
+
                 _url = f"https://encodeproject.org/{_acc}/@@download/{_base}"
+                print(f"{_path} does not exist")
                 _f.write(
                     MANIFEST_ENTRY_FORMAT.format(url=_url, dir=_dir, out=_base)
                 )
