@@ -182,9 +182,17 @@ def _(
     etl_files_table,
     mo,
 ):
-    files_df = etl_files_table(RESOURCES / "Files.parquet")
-    experiments_df = etl_experiments_table(RESOURCES / "Experiments.parquet")
-    annotations_df = etl_annotations_table(RESOURCES / "Annotations.parquet")
+    # files_df = etl_files_table(RESOURCES / "Files.parquet")
+    # experiments_df = etl_experiments_table(RESOURCES / "Experiments.parquet")
+    # annotations_df = etl_annotations_table(RESOURCES / "Annotations.parquet")
+
+    files_df = etl_files_table(RESOURCES / "parquets" / "file_report.parquet")
+    experiments_df = etl_experiments_table(
+        RESOURCES / "parquets" / "experiment_report.parquet"
+    )
+    annotations_df = etl_annotations_table(
+        RESOURCES / "parquets" / "annotation_report.parquet"
+    )
 
     mo.vstack(
         [
