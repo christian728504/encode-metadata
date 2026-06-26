@@ -48,9 +48,7 @@ def _(Path, os):
 
 @app.cell
 def _(BPNET_DIR, CHROMBPNET_DIR, Literal, pl):
-    def file_path(
-        list_col: str, model: Literal["CHROMBPNET", "BPNET"] = "CHROMBPNET"
-    ):
+    def file_path(list_col: str, model: Literal["CHROMBPNET", "BPNET"] = "CHROMBPNET"):
         """List[str] of filenames -> comma-joined {CHROMBPNET_DIR}/{filename} paths."""
         if model == "CHROMBPNET":
             _dir = CHROMBPNET_DIR
@@ -58,9 +56,7 @@ def _(BPNET_DIR, CHROMBPNET_DIR, Literal, pl):
             _dir = BPNET_DIR
 
         return (
-            pl.col(list_col)
-            .list.eval(pl.lit(_dir + "/") + pl.element())
-            .list.join(",")
+            pl.col(list_col).list.eval(pl.lit(_dir + "/") + pl.element()).list.join(",")
         )
 
     return (file_path,)
@@ -170,9 +166,7 @@ def _(pl):
                 descending=[False, True],
                 nulls_last=True,
             )
-            .unique(
-                subset="experiment_accession", keep="first", maintain_order=True
-            )
+            .unique(subset="experiment_accession", keep="first", maintain_order=True)
         )
 
     return (dedup_oldest,)
@@ -228,12 +222,13 @@ def _(join_df, pl, to_snake_case):
     chrombpnet_pivot = (
         join_df.filter(
             pl.col("annotation_type").eq("ChromBPNet-model")
-            | pl.col("annotation_type")
-            .eq("ProCapNet")(
-                pl.col("output_type").eq("predicted signal profile")
-                & pl.col("file_accession").str.ends_with(".bigWig")
-            )
-            .not_(),
+            | (
+                pl.col("annotation_type").eq("ProCapNet")
+                & (
+                    pl.col("output_type").eq("predicted signal profile")
+                    & pl.col("file_accession").str.ends_with(".bigWig")
+                ).not_()
+            ),
         )
         .pivot(
             "output_type",
@@ -300,9 +295,7 @@ def _(MANIFEST_ENTRY_FORMAT, OUTPUT, Path, chrombpnet_derived, os):
 
                 _url = f"https://encodeproject.org/{_acc}/@@download/{_base}"
                 print(f"{_path} does not exist")
-                _f.write(
-                    MANIFEST_ENTRY_FORMAT.format(url=_url, dir=_dir, out=_base)
-                )
+                _f.write(MANIFEST_ENTRY_FORMAT.format(url=_url, dir=_dir, out=_base))
     return
 
 
@@ -322,12 +315,8 @@ def _(OUTPUT, chrombpnet_derived, mo, pl):
         pl.col("organism").alias("Organism"),
         pl.col("assay_name").alias("Assay term name"),
         pl.col("models").alias("Annotation models file"),
-        pl.col("observed_signal_profile").alias(
-            "Annotation observed signal profile"
-        ),
-        pl.col("predicted_signal_profile").alias(
-            "Annotation predicted signal profile"
-        ),
+        pl.col("observed_signal_profile").alias("Annotation observed signal profile"),
+        pl.col("predicted_signal_profile").alias("Annotation predicted signal profile"),
         pl.col("training_and_test_regions").alias(
             "Annotation test and training regions"
         ),
@@ -338,9 +327,7 @@ def _(OUTPUT, chrombpnet_derived, mo, pl):
     ).sort("Annotation accession")
 
     chrombpnet_df.write_parquet(OUTPUT / "ChromBPNet-model-annotations.parquet")
-    chrombpnet_df.write_csv(
-        OUTPUT / "ChromBPNet-model-annotations.tsv", separator="\t"
-    )
+    chrombpnet_df.write_csv(OUTPUT / "ChromBPNet-model-annotations.tsv", separator="\t")
 
     mo.ui.table(chrombpnet_df, page_size=25)
     return
@@ -423,12 +410,11 @@ def _(MANIFEST_ENTRY_FORMAT, OUTPUT, Path, bpnet_derived, os):
             _df["models"].to_list()
             + _df["observed_control_profile_plus_strand"].to_list()
             + _df["observed_control_profile_minus_strand"].to_list()
-            + _df["observed_control_profile_plus_strand"].to_list()
-            + _df["observed_control_profile_minus_strand"].to_list()
+            + _df["observed_signal_profile_plus_strand"].to_list()
+            + _df["observed_signal_profile_minus_strand"].to_list()
             + _df["training_and_test_regions"].to_list()
             + _df["profile_sequence_contribution_scores"].to_list()
             + _df["counts_sequence_contribution_scores"].to_list()
-            + _df["training_and_test_regions"].to_list()
         ):
             _path = Path(_path)
             if not _path.exists():
@@ -443,9 +429,7 @@ def _(MANIFEST_ENTRY_FORMAT, OUTPUT, Path, bpnet_derived, os):
 
                 _url = f"https://encodeproject.org/{_acc}/@@download/{_base}"
                 print(f"{_path} does not exist")
-                _f.write(
-                    MANIFEST_ENTRY_FORMAT.format(url=_url, dir=_dir, out=_base)
-                )
+                _f.write(MANIFEST_ENTRY_FORMAT.format(url=_url, dir=_dir, out=_base))
     return
 
 
