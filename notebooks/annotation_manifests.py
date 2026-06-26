@@ -71,7 +71,10 @@ def _(pl):
     def live(df):
         """Drop rows retracted by ENCODE (deleted/revoked status)."""
         return df.filter(
-            pl.col("status").is_in(["deleted", "revoked"]).not_().fill_null(False)
+            pl.col("status")
+            .is_in(["deleted", "revoked", "archived"])
+            .not_()
+            .fill_null(False)
         )
 
     return (live,)
@@ -206,7 +209,7 @@ def _(
 
 
 @app.cell
-def _(annotations_df, experiments_df, files_df):
+def _(annotations_df, experiments_df, files_df, mo):
     join_df = (
         annotations_df.join(
             experiments_df, how="left", left_on="experimental_input", right_on="id"
@@ -215,6 +218,8 @@ def _(annotations_df, experiments_df, files_df):
         .join(files_df, how="left", left_on="files", right_on="id")
         .drop("files")
     )
+
+    mo.ui.table(join_df)
     return (join_df,)
 
 
@@ -222,11 +227,13 @@ def _(annotations_df, experiments_df, files_df):
 def _(join_df, pl, to_snake_case):
     chrombpnet_pivot = (
         join_df.filter(
-            pl.col("annotation_type") == "ChromBPNet-model",
-            (
+            pl.col("annotation_type").eq("ChromBPNet-model")
+            | pl.col("annotation_type")
+            .eq("ProCapNet")(
                 pl.col("output_type").eq("predicted signal profile")
                 & pl.col("file_accession").str.ends_with(".bigWig")
-            ).not_(),
+            )
+            .not_(),
         )
         .pivot(
             "output_type",
@@ -353,6 +360,14 @@ def _(join_df, pl, to_snake_case):
                 pl.col("output_type").eq("predicted signal profile")
                 & pl.col("file_accession").str.ends_with(".bigWig")
             ).not_(),
+            (
+                pl.col("output_type").eq("counts sequence contribution scores")
+                & pl.col("file_accession").str.ends_with(".tar.gz")
+            ).not_(),
+            (
+                pl.col("output_type").eq("profile sequence contribution scores")
+                & pl.col("file_accession").str.ends_with(".tar.gz")
+            ).not_(),
         )
         .pivot(
             "output_type",
@@ -386,6 +401,8 @@ def _(bpnet_deduped, file_path, pl):
         file_path("training_and_test_regions", model="BPNET"),
         file_path("observed_control_profile_plus_strand", model="BPNET"),
         file_path("observed_control_profile_minus_strand", model="BPNET"),
+        file_path("profile_sequence_contribution_scores", model="BPNET"),
+        file_path("counts_sequence_contribution_scores", model="BPNET"),
         pl.col("alignments")
         .list.eval(pl.element().str.split(".").list.first())
         .list.join(","),
@@ -408,6 +425,9 @@ def _(MANIFEST_ENTRY_FORMAT, OUTPUT, Path, bpnet_derived, os):
             + _df["observed_control_profile_minus_strand"].to_list()
             + _df["observed_control_profile_plus_strand"].to_list()
             + _df["observed_control_profile_minus_strand"].to_list()
+            + _df["training_and_test_regions"].to_list()
+            + _df["profile_sequence_contribution_scores"].to_list()
+            + _df["counts_sequence_contribution_scores"].to_list()
             + _df["training_and_test_regions"].to_list()
         ):
             _path = Path(_path)
@@ -459,6 +479,12 @@ def _(OUTPUT, bpnet_derived, mo, pl):
         ),
         pl.col("training_and_test_regions").alias(
             "Annotation training and test regions file"
+        ),
+        pl.col("profile_sequence_contribution_scores").alias(
+            "Annotation profile sequence contrbiution scores"
+        ),
+        pl.col("counts_sequence_contribution_scores").alias(
+            "Annotation counts sequence contribution scores"
         ),
         pl.col("alignments").alias("Annotation alignments file accessions"),
         pl.col("unfiltered_alignments").alias(
