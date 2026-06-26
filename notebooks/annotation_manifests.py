@@ -132,10 +132,16 @@ def _(live, pl, to_snake_case):
                 "genome_assembly",
                 "date_created",
                 pl.col("experimental_input").str.split(","),
+                # Tag provenance so own files can win over contributing files that
+                # ENCODE labels with the same output_type (see join_df below).
                 pl.concat_list(
                     pl.col("files").str.split(","),
                     pl.col("contributing_files").str.split(","),
                 ).alias("files"),
+                pl.concat_list(
+                    pl.col("files").str.split(",").list.eval(pl.lit(True)),
+                    pl.col("contributing_files").str.split(",").list.eval(pl.lit(False)),
+                ).alias("is_own"),
             )
             .rename(
                 {
@@ -144,7 +150,7 @@ def _(live, pl, to_snake_case):
                 }
             )
             .explode("experimental_input")
-            .explode("files")
+            .explode("files", "is_own")
         )
 
     return (etl_annotations_table,)
@@ -211,6 +217,19 @@ def _(annotations_df, experiments_df, files_df, mo):
         .drop("experimental_input")
         .join(files_df, how="left", left_on="files", right_on="id")
         .drop("files")
+        # Drop contributing files whose output_type duplicates one the annotation
+        # already produces itself (e.g. a contributing "observed signal profile
+        # (minus strand)" borrowed from another annotation collides with the
+        # annotation's own one). Keep contributing files for output_types the
+        # annotation has none of its own (control profiles, alignments, bias models).
+        .with_columns(
+            pl.col("is_own")
+            .any()
+            .over("annotation_accession", "output_type")
+            .alias("_has_own")
+        )
+        .filter(pl.col("is_own") | pl.col("_has_own").not_())
+        .drop("is_own", "_has_own")
     )
 
     mo.ui.table(join_df)
@@ -221,14 +240,20 @@ def _(annotations_df, experiments_df, files_df, mo):
 def _(join_df, pl, to_snake_case):
     chrombpnet_pivot = (
         join_df.filter(
-            pl.col("annotation_type").eq("ChromBPNet-model")
+            (
+                pl.col("annotation_type").eq("ChromBPNet-model")
+                & (
+                    pl.col("output_type").eq("predicted signal profile")
+                    & pl.col("file_accession").str.ends_with(".bigWig")
+                ).not_()
+            )
             | (
                 pl.col("annotation_type").eq("ProCapNet")
                 & (
                     pl.col("output_type").eq("predicted signal profile")
                     & pl.col("file_accession").str.ends_with(".bigWig")
                 ).not_()
-            ),
+            )
         )
         .pivot(
             "output_type",
